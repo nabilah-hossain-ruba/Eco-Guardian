@@ -48,7 +48,7 @@ Cam_Min_Hei = 80
 Cam_Max_Hei = 1200  
 fov_first = 60
 fov_third = 82  
-road_width = 100
+road_width = 200
 
 def update_player_dir():
     global player_dir
@@ -129,42 +129,42 @@ def draw_grid():
     glBegin(GL_QUADS)
     glVertex3f(-grid_length, 0, -grid_length)
     glVertex3f(-grid_length, 0, grid_length)
-    glVertex3f(-road_width, 0, grid_length)
-    glVertex3f(-road_width, 0, -grid_length)
+    glVertex3f(-(road_width / 2), 0, grid_length)
+    glVertex3f(-(road_width / 2), 0, -grid_length)
 
     glVertex3f(grid_length, 0, -grid_length)
     glVertex3f(grid_length, 0, grid_length)
-    glVertex3f(road_width, 0, grid_length)
-    glVertex3f(road_width, 0, -grid_length)
+    glVertex3f((road_width / 2), 0, grid_length)
+    glVertex3f((road_width / 2), 0, -grid_length)
     glEnd()
 
 def draw_road():
     glColor3f(0.3, 0.3, 0.3)
     glBegin(GL_QUADS)
-    glVertex3f(-road_width, 2, -grid_length)
-    glVertex3f(road_width, 2, -grid_length)
-    glVertex3f(road_width, 2, grid_length)
-    glVertex3f(-road_width, 2, grid_length)
+    glVertex3f(-(road_width / 2), 2, -grid_length)
+    glVertex3f((road_width / 2), 2, -grid_length)
+    glVertex3f((road_width / 2), 2, grid_length)
+    glVertex3f(-(road_width / 2), 2, grid_length)
     
     glVertex3f(-grid_length, 2, 350)   # bottom-left
-    glVertex3f(-road_width, 2, 350)    # bottom-right
-    glVertex3f(-road_width, 2, 550)    # top-right
+    glVertex3f(-(road_width / 2), 2, 350)    # bottom-right
+    glVertex3f(-(road_width / 2), 2, 550)    # top-right
     glVertex3f(-grid_length, 2, 550)   # top-left
 
 
     glVertex3f(-grid_length, 2, -350)   # bottom-left
-    glVertex3f(-road_width, 2, -350)    # bottom-right
-    glVertex3f(-road_width, 2, -550)    # top-right
+    glVertex3f(-(road_width / 2), 2, -350)    # bottom-right
+    glVertex3f(-(road_width / 2), 2, -550)    # top-right
     glVertex3f(-grid_length, 2, -550)
 
     glVertex3f(grid_length, 2, 350)   # bottom-left
-    glVertex3f(road_width, 2, 350)    # bottom-right
-    glVertex3f(road_width, 2, 550)    # top-right
+    glVertex3f((road_width / 2), 2, 350)    # bottom-right
+    glVertex3f((road_width / 2), 2, 550)    # top-right
     glVertex3f(grid_length, 2, 550)
 
     glVertex3f(grid_length, 2, -350)   # bottom-left
-    glVertex3f(road_width, 2, -350)    # bottom-right
-    glVertex3f(road_width, 2, -550)    # top-right
+    glVertex3f((road_width / 2), 2, -350)    # bottom-right
+    glVertex3f((road_width / 2), 2, -550)    # top-right
     glVertex3f(grid_length, 2, -550)
     glEnd()
     
@@ -179,11 +179,45 @@ def draw_wall(x1,z1,x2,z2,h,color):
     glEnd()
 
 def draw_boundaries():
-    h=100
+    # Outside grid
+    h=100 
     draw_wall(-grid_length,-grid_length, -grid_length, grid_length, h,(0.96, 0.64, 0.35))
     draw_wall(-grid_length,grid_length, grid_length,grid_length, h,(0.96, 0.64, 0.35))
     draw_wall(grid_length,grid_length, grid_length,-grid_length, h,(0.96, 0.64, 0.35))
     draw_wall(grid_length,-grid_length,-grid_length,-grid_length,h,(0.96, 0.64, 0.35))
+
+
+def draw_home_boundary():
+    h = 100
+    x1, z1, x2, z2 = grid_length, 550, road_width/2, 350
+
+    # Left bottom road
+    draw_wall(-x1, z1, -x2, z1, h, (0.96, 0.64, 0.35)) 
+    draw_wall(-x1, z2, -x2, z2, h, (0.96, 0.64, 0.35))
+
+    # Left top road
+    draw_wall(-x1, -z1, -x2, -z1, h, (0.96, 0.64, 0.35)) 
+    draw_wall(-x1, -z2, -x2, -z2, h, (0.96, 0.64, 0.35))  
+
+    # Right bottom road
+    draw_wall(x1, z1, x2, z1, h, (0.96, 0.64, 0.35)) 
+    draw_wall(x1, z2, x2, z2, h, (0.96, 0.64, 0.35))
+
+    # Right top road
+    draw_wall(x1, -z1, x2, -z1, h, (0.96, 0.64, 0.35)) 
+    draw_wall(x1, -z2, x2, -z2, h, (0.96, 0.64, 0.35)) 
+
+    # Centre Road walls
+    draw_wall(-100, grid_length, -100, 900, h, (0.96, 0.64, 0.35)) 
+    draw_wall(100, grid_length, 100, 900, h, (0.96, 0.64, 0.35))
+    draw_wall(-100, -grid_length, -100, -900, h, (0.96, 0.64, 0.35))
+    draw_wall(100, -grid_length, 100, -900, h, (0.96, 0.64, 0.35))
+
+    draw_wall(-100, 350, -100, 0, h, (0.96, 0.64, 0.35)) 
+    draw_wall(100, -350, 100, 0, h, (0.96, 0.64, 0.35))   
+
+
+
 
 
 # =================================....DRAW DUSTBIN...=================================
@@ -266,12 +300,12 @@ def draw_square():
 def draw_lamp(x, y):
     glPushMatrix()
     glTranslatef(x, 0, y)
-    draw_cylinder_bin([0.55, 0.27, 0.07], 5, 5, 120)  #Brown
+    draw_cylinder_bin([0.55, 0.27, 0.07], 5, 5, 130)  #Brown
     glPopMatrix()
     
     glPushMatrix()
     glColor3f(1, 1, 0)   # Yellow
-    glTranslatef(x, 120, y)
+    glTranslatef(x, 130, y)
     gluSphere(gluNewQuadric(), 25, 20, 20)
     glPopMatrix()
 
@@ -403,6 +437,7 @@ def showScreen():
     draw_road()
     draw_bins()
     draw_square()
+    draw_home_boundary()
     set_lamp()
     draw_boundaries() 
     draw_player()
