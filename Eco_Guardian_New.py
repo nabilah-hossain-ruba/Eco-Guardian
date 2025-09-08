@@ -187,11 +187,11 @@ def draw_boundaries():
 
 
 # =================================....DRAW DUSTBIN...=================================
-def draw_cylinder_bin(color):
+def draw_cylinder_bin(color, top, bottom, hei):
     glPushMatrix()
     glColor3f(color[0], color[1], color[2])  
     glRotatef(-90, 1, 0, 0)  # Rotate so cylinder stands up
-    gluCylinder(gluNewQuadric(), 22, 15, 20, 20, 20)
+    gluCylinder(gluNewQuadric(), top, bottom, hei, 20, 20)
     glPopMatrix()
 
 
@@ -212,7 +212,7 @@ def draw_bins():
 
     glPushMatrix()
     glTranslatef(-50, 52, 1200)
-    draw_cylinder_bin([1.0, 0.81, 0.91])
+    draw_cylinder_bin([1.0, 0.81, 0.91], 22, 15, 20)
     glPopMatrix()
 
 
@@ -224,7 +224,7 @@ def draw_bins():
 
     glPushMatrix()
     glTranslatef(50, 52, 1200)
-    draw_cylinder_bin([0.56, 0.93, 0.56])
+    draw_cylinder_bin([0.56, 0.93, 0.56], 22, 15, 20)
     glPopMatrix()
 
 
@@ -236,7 +236,7 @@ def draw_bins():
 
     glPushMatrix()
     glTranslatef(-50, 52, -1200)
-    draw_cylinder_bin([0.33, 0.75, 0.88])
+    draw_cylinder_bin([0.33, 0.75, 0.88], 22, 15, 20)
     glPopMatrix()
 
 
@@ -248,9 +248,50 @@ def draw_bins():
 
     glPushMatrix()
     glTranslatef(50, 52, -1200)
-    draw_cylinder_bin([0.95, 0.65, 0.65])
+    draw_cylinder_bin([0.95, 0.65, 0.65], 22, 15, 20)
     glPopMatrix()
-#=======================================================================
+
+
+#===========================...DRAW HOUSE...=================================
+def draw_square():
+    glPushMatrix()
+    glColor3f(1, 1, 0)        # Yellow
+    glTranslatef(-650, 0, 900)
+    glScalef(6, 4, 3)       # Flatten cube into a square plate
+    glutSolidCube(50)
+    glPopMatrix()
+
+
+# =====================...DRAW LAMP...==================================
+def draw_lamp(x, y):
+    glPushMatrix()
+    glTranslatef(x, 0, y)
+    draw_cylinder_bin([0.55, 0.27, 0.07], 5, 5, 120)  #Brown
+    glPopMatrix()
+    
+    glPushMatrix()
+    glColor3f(1, 1, 0)   # Yellow
+    glTranslatef(x, 120, y)
+    gluSphere(gluNewQuadric(), 25, 20, 20)
+    glPopMatrix()
+
+
+def set_lamp():
+    draw_lamp(100, 900)
+    draw_lamp(-100, 900)    
+    draw_lamp(100, -900)
+    draw_lamp(-100, -900)
+    draw_lamp(100, 0)
+    draw_lamp(-100, 0)
+
+    draw_lamp(-620, 550)
+    draw_lamp(-620, 350)
+    draw_lamp(620, 550)
+    draw_lamp(620, 350)
+    draw_lamp(-620, -550)
+    draw_lamp(-620, -350)
+    draw_lamp(620, -550)
+    draw_lamp(620, -350)
 
 
 
@@ -361,6 +402,8 @@ def showScreen():
     draw_grid()
     draw_road()
     draw_bins()
+    draw_square()
+    set_lamp()
     draw_boundaries() 
     draw_player()
     glDisable(GL_DEPTH_TEST)
