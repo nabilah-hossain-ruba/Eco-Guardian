@@ -349,14 +349,35 @@ def check_collisions():
 
 def keyboardListener(key,x,y):
     global gun_angle, cheat_mode, auto_camera, player_pos, fp_cam_yaw
+    global current_trash, inventory
     key=key.decode("utf-8").lower()
     if game_over:
         if key=="r": reset_game(); return
         return  
-    if key=="w": player_pos[0]+=player_dir[0]*10; player_pos[2]+=player_dir[1]*10
-    elif key=="s": player_pos[0]-=player_dir[0]*10; player_pos[2]-=player_dir[1]*10
-    elif key=="a": gun_angle+=5; update_player_dir()
-    elif key=="d": gun_angle-=5; update_player_dir()
+    if key=="w": 
+        #player_pos[0]+=player_dir[0]*10; player_pos[2]+=player_dir[1]*10
+        #[uporer line gulai variable e rakhse]
+#==================================check_collision with trash=====================================
+        new_x = player_pos[0] + player_dir[0]*10 
+        new_z = player_pos[2] + player_dir[1]*10
+        if is_position_free(new_x, new_z, margin=20):
+            player_pos[0] = new_x
+            player_pos[2] = new_z
+#=================================================================================================
+    elif key=="s": 
+        #player_pos[0]-=player_dir[0]*10; player_pos[2]-=player_dir[1]*10
+        # [uporer line gulai variable e rakhse]
+#==================================check_collision with trash=====================================
+        new_x = player_pos[0] - player_dir[0]*10
+        new_z = player_pos[2] - player_dir[1]*10
+        if is_position_free(new_x, new_z, margin=20):
+            player_pos[0] = new_x
+            player_pos[2] = new_z       
+#=================================================================================================
+    elif key=="a": 
+        gun_angle+=5; update_player_dir()
+    elif key=="d": 
+        gun_angle-=5; update_player_dir()
     elif key=="c":
         cheat_mode = not cheat_mode
         print('Cheat Mode:', 'ON' if cheat_mode else 'OFF')
@@ -371,7 +392,18 @@ def keyboardListener(key,x,y):
             fp_cam_yaw = gun_angle  
         print('Auto Camera Follow:', 'ON' if auto_camera else 'OFF')
        
-   
+# =================================key for collect =====================================
+    elif key == "n" and current_trash:
+        if len(inventory) < inventory_limit:
+            inventory.append(current_trash["name"])
+            trash_items.remove(current_trash)
+            print(f"Collected: {current_trash['name']}")
+            current_trash = None
+        else:
+            print("Inventory full!")
+#====================================================================================
+
+
     limit = grid_length - player_margin
     player_pos[0] = max(-limit, min(limit, player_pos[0]))
     player_pos[2] = max(-limit, min(limit, player_pos[2]))
@@ -431,7 +463,9 @@ def setupCamera():
         gluLookAt(eye_x, eye_y, eye_z, look_x, look_y, look_z, 0, 1, 0)
 
 def showScreen():
-    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+    
+    # ===== 3D Scene =====
     setupCamera()
     draw_grid()
     draw_road()
@@ -439,20 +473,54 @@ def showScreen():
     draw_square()
     draw_home_boundary()
     set_lamp()
-    draw_boundaries() 
+    draw_boundaries()
     draw_player()
-    glDisable(GL_DEPTH_TEST)
-    glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity()
-    gluOrtho2D(0,glutGet(GLUT_WINDOW_WIDTH),0,glutGet(GLUT_WINDOW_HEIGHT))
-    glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity()
-    if not game_over: draw_text(10,glutGet(GLUT_WINDOW_HEIGHT)-20,f"Life:{life} Score:{score} Missed:{missed_bullets}")
-    else: draw_text(10,glutGet(GLUT_WINDOW_HEIGHT)-20,f"GAME OVER. Score {score}. Press R.")
-    glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW); glPopMatrix()
-    glEnable(GL_DEPTH_TEST); glutSwapBuffers()
+    draw_trash()
 
+    # ===== 2D HUD =====
+    glDisable(GL_DEPTH_TEST)
+
+    # Save and switch to orthographic projection
+    glMatrixMode(GL_PROJECTION)
+    glPushMatrix()
+    glLoadIdentity()
+    gluOrtho2D(0, glutGet(GLUT_WINDOW_WIDTH), 0, glutGet(GLUT_WINDOW_HEIGHT))
+
+    glMatrixMode(GL_MODELVIEW)
+    glPushMatrix()
+    glLoadIdentity()
+
+    # Draw HUD text
+    if not game_over:
+        draw_text(10, glutGet(GLUT_WINDOW_HEIGHT) - 20,
+                  f"Life:{life} Score:{score} Missed:{missed_bullets}")
+    else:
+        draw_text(10, glutGet(GLUT_WINDOW_HEIGHT) - 20,
+                  f"GAME OVER. Score {score}. Press R.")
+
+    # Trash collection
+    if current_trash:
+        draw_text(10, glutGet(GLUT_WINDOW_HEIGHT) - 50,
+                  f"Press N to collect trash; Name: {current_trash['name']}")
+
+    # Inventory display
+    draw_text(10, glutGet(GLUT_WINDOW_HEIGHT) - 80,
+              "Inventory: " + ", ".join(inventory))
+
+    # Restore previous projection/modelview
+    glPopMatrix()  # MODELVIEW
+    glMatrixMode(GL_PROJECTION)
+    glPopMatrix()
+    glMatrixMode(GL_MODELVIEW)
+
+    glEnable(GL_DEPTH_TEST)
+    glutSwapBuffers()
+
+#==========================================================================
 def idle():
     if not game_over:
         check_collisions()
+        check_trash_in_front() #updated to view trash
     glutPostRedisplay()
 
 def reset_game():
@@ -462,6 +530,101 @@ def reset_game():
     print('New game started')
 
 
+# =====================...TRASH GENERATION...==================================
+
+trash_items = []
+trash_types = {
+    "PAPER": [("Newspaper",(1,1,0.8)), ("Quiz script",(1,1,0.9)), ("Cardboard box",(0.9,0.9,0.6)), ("Paper cup",(1,0.9,0.8)), ("Envelope",(1,0.95,0.8)), ("Paper bag",(0.95,0.85,0.7))],
+    "GLASS": [("Glass jar",(0.7,0.9,1)), ("Drinking glass",(0.8,1,1)), ("Wine bottle",(0.6,0.8,1)), ("Jam jar",(0.5,0.7,1)), ("Medicine syrup bottle",(0.4,0.6,1))],
+    "PLASTIC": [("Chanachur packet",(0,1,0)), ("Chips packet",(0.1,0.9,0)), ("Shampoo sachet",(0,0.8,0)), ("Water bottle",(0,0.7,0.2)), ("Plastic bags",(0.2,0.9,0)), ("Oil container",(0,0.6,0))],
+    "METAL": [("Soft drink can",(1,0,0)), ("Food can",(0.8,0,0)), ("Foil paper",(1,0.2,0)), ("Murir tin",(0.9,0,0)), ("Mosquito spray can",(0.7,0,0))],
+    "BIODEGRADABLE": [("Banana peel",(1,0.9,0.2)), ("Coconut shell",(0.8,0.7,0.3)), ("Fish bones",(1,1,1)), ("Eggshell",(0.9,0.9,0.8)), ("Leftover rice",(1,1,0.9))]
+}
+
+def generate_trash(n=20, min_distance_from_player=100):
+    trash_items.clear()
+    attempts = 0
+    max_attempts = n * 10
+
+    while len(trash_items) < n and attempts < max_attempts:
+        attempts += 1
+
+        category = random.choice(list(trash_types.keys()))
+        name, color = random.choice(trash_types[category])
+        shape = random.choice(["cube", "cylinder"])
+        size = random.randint(20, 40)
+
+        x = random.randint(-grid_length + 50, grid_length - 50)
+        z = random.randint(-grid_length + 50, grid_length - 50)
+
+        # Check distance from player AND other trash
+        if math.hypot(player_pos[0] - x, player_pos[2] - z) >= min_distance_from_player \
+           and is_position_free(x, z, margin=size):
+            trash_items.append({
+                "pos": [x, 0, z],
+                "shape": shape,
+                "size": size,
+                "color": color,
+                "name": name
+            })
+
+def is_position_free(x, z, margin=25):
+    for t in trash_items:
+        tx, tz = t["pos"][0], t["pos"][2]
+        if math.hypot(x - tx, z - tz) < (margin + t["size"]/2):
+            return False
+    return True
+
+def draw_trash():
+    if not trash_items:
+        return
+
+    quad = gluNewQuadric()  # Create one quadric for all cylinders
+    for t in trash_items:
+        glPushMatrix()
+        glTranslatef(t["pos"][0], t["size"]/2, t["pos"][2])
+        glColor3f(*t["color"])
+
+        if t["shape"] == "cube":
+            glPushMatrix()
+            glScalef(t["size"], t["size"], t["size"])
+            glutSolidCube(1)
+            glPopMatrix()
+        else:  # Cylinder
+            glPushMatrix()
+            glRotatef(-90, 1, 0, 0)
+            gluCylinder(quad, t["size"]/2, t["size"]/2, t["size"], 12, 12)
+            glPopMatrix()
+
+        glPopMatrix()
+    gluDeleteQuadric(quad)
+
+
+# =======================...TRASH COLLECT...==================================
+inventory = []          # Holds collected trash
+inventory_limit = 5     # Max trash the player can carry
+current_trash = None    
+
+def check_trash_in_front():
+    global current_trash
+    current_trash = None
+    for t in trash_items:
+        dx = t["pos"][0] - player_pos[0]
+        dz = t["pos"][2] - player_pos[2]
+        distance = math.hypot(dx, dz)
+        
+        # Check if it's roughly in front (within 60 degrees of player direction) and close enough
+        if distance < 50: 
+            angle_to_trash = math.atan2(dz, dx)
+            player_angle_rad = math.atan2(player_dir[1], player_dir[0])
+            angle_diff = (angle_to_trash - player_angle_rad + math.pi) % (2*math.pi) - math.pi
+            if abs(angle_diff) < math.radians(60):
+                current_trash = t
+
+                break
+
+
+
 glutInit()
 glutInitDisplayMode(GLUT_DOUBLE|GLUT_RGB|GLUT_DEPTH)
 glutInitWindowSize(1000,800)
@@ -469,6 +632,7 @@ glutCreateWindow(b"Bullet Frenzy - Alternative Implementation")
 glClearColor(0,0,0,1)
 glEnable(GL_DEPTH_TEST)
 update_player_dir()
+generate_trash(n=20)#drawingtrash
 glutDisplayFunc(showScreen)
 glutKeyboardFunc(keyboardListener)
 glutSpecialFunc(specialKeyListener)
