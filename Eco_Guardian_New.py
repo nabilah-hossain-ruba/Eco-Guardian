@@ -63,7 +63,6 @@ def draw_text(x, y, text):
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(ch))
 
 
-
 def draw_player():
     glPushMatrix()
     glTranslatef(player_pos[0], player_pos[1], player_pos[2])
@@ -88,7 +87,6 @@ def draw_player():
         glColor3f(0, 0, 0)
         glutSolidSphere(12, 20, 20)
         glPopMatrix()
-
      
     glPushMatrix()
     arm_y = 45 if not game_over else torso_y + 10  
@@ -187,6 +185,100 @@ def draw_boundaries():
     draw_wall(grid_length,grid_length, grid_length,-grid_length, h,(0.96, 0.64, 0.35))
     draw_wall(grid_length,-grid_length,-grid_length,-grid_length,h,(0.96, 0.64, 0.35))
 
+#===========================. . .maze in open space. . .=======================
+def generate_maze():
+    global maze_walls
+    maze_walls = []
+    h = 100
+    color = (0.6, 0.4, 0.3)
+    min_cell_size = 100 
+
+    half_grid = grid_length
+    road = road_width
+    offset = 100
+
+    # Open space sizes
+    open_width = (2 * half_grid - road) / 2
+    open_height = (2 * half_grid - 2 * road) / 3
+
+    # Centers of open spaces
+    x_centers = [-open_width / 2, open_width / 2 + road]
+    z_centers = [half_grid - open_height / 2,
+                 half_grid - open_height - road - open_height / 2,
+                 -half_grid + open_height / 2]
+
+    for zc in z_centers:
+        for xc in x_centers:
+            # Calculate dynamic maze rows/cols to fully fill open space
+            maze_cols = max(1, int(open_width // min_cell_size))
+            maze_rows = max(1, int(open_height // min_cell_size))
+            maze_cell_size_x = open_width / maze_cols
+            maze_cell_size_z = open_height / maze_rows
+
+            # Start coordinates (top-left) with offset applied
+            start_x = xc - open_width / 2 - offset
+            start_z = zc - open_height / 2
+
+            # Initialize cells [visited, top, right, bottom, left]
+            grid = [[[False, True, True, True, True] for _ in range(maze_cols)] for _ in range(maze_rows)]
+
+            # Iterative carving
+            stack = [(maze_rows // 2, maze_cols // 2)]
+            grid[maze_rows // 2][maze_cols // 2][0] = True
+            while stack:
+                r, c = stack[-1]
+                dirs = [(0, -1), (1, 0), (0, 1), (-1, 0)]
+                random.shuffle(dirs)
+                moved = False
+                for dr, dc in dirs:
+                    nr, nc = r + dr, c + dc
+                    if 0 <= nr < maze_rows and 0 <= nc < maze_cols and not grid[nr][nc][0]:
+                        # Remove walls
+                        if dr == 1:
+                            grid[r][c][3] = False
+                            grid[nr][nc][1] = False
+                        elif dr == -1:
+                            grid[r][c][1] = False
+                            grid[nr][nc][3] = False
+                        elif dc == 1:
+                            grid[r][c][2] = False
+                            grid[nr][nc][4] = False
+                        elif dc == -1:
+                            grid[r][c][4] = False
+                            grid[nr][nc][2] = False
+                        grid[nr][nc][0] = True
+                        stack.append((nr, nc))
+                        moved = True
+                        break
+                if not moved:
+                    stack.pop()
+
+            # Convert walls to coordinates (skip outer border walls)
+            for r in range(maze_rows):
+                for c in range(maze_cols):
+                    x1 = start_x + c * maze_cell_size_x
+                    z1 = start_z + r * maze_cell_size_z
+                    x2 = x1 + maze_cell_size_x
+                    z2 = z1 + maze_cell_size_z
+
+                    # Only internal walls
+                    if r > 0 and grid[r][c][1]:
+                        maze_walls.append([x1, z1, x2, z1, h, color])
+                    if c < maze_cols - 1 and grid[r][c][2]:
+                        maze_walls.append([x2, z1, x2, z2, h, color])
+                    if r < maze_rows - 1 and grid[r][c][3]:
+                        maze_walls.append([x1, z2, x2, z2, h, color])
+                    if c > 0 and grid[r][c][4]:
+                        maze_walls.append([x1, z1, x1, z2, h, color])
+
+
+def draw_maze():
+    for wall in maze_walls:
+        x1, z1, x2, z2, h, color = wall
+        draw_wall(x1, z1, x2, z2, h, color)
+
+#=========================up====================================
+
 
 def draw_home_boundary():
     h = 100
@@ -216,8 +308,6 @@ def draw_home_boundary():
 
     draw_wall(-100, 350, -100, 0, h, (0.96, 0.64, 0.35)) 
     draw_wall(100, -350, 100, 0, h, (0.96, 0.64, 0.35))   
-
-
 
 
 
@@ -288,13 +378,13 @@ def draw_bins():
 
 
 #===========================...DRAW HOUSE...=================================
-def draw_square():
-    glPushMatrix()
-    glColor3f(1, 1, 0)        # Yellow
-    glTranslatef(-650, 0, 900)
-    glScalef(6, 4, 3)       # Flatten cube into a square plate
-    glutSolidCube(50)
-    glPopMatrix()
+# def draw_square():
+#     glPushMatrix()
+#     glColor3f(1, 1, 0)        # Yellow
+#     glTranslatef(-650, 0, 900)
+#     glScalef(6, 4, 3)       # Flatten cube into a square plate
+#     glutSolidCube(50)
+#     glPopMatrix()
 
 
 # =====================...DRAW LAMP...==================================
@@ -475,10 +565,11 @@ def showScreen():
     draw_grid()
     draw_road()
     draw_bins()
-    draw_square()
+    # draw_square()
     draw_home_boundary()
     set_lamp()
     draw_boundaries()
+    draw_maze()
     draw_player()
     draw_trash()
 
@@ -584,6 +675,13 @@ def is_position_free(x, z, margin=25):
         tx, tz = t["pos"][0], t["pos"][2]
         if math.hypot(x - tx, z - tz) < (margin + t["size"]/2):
             return False
+    for wall in maze_walls:
+        x1, z1, x2, z2, _, _ = wall
+        min_x, max_x = min(x1,x2), max(x1,x2)
+        min_z, max_z = min(z1,z2), max(z1,z2)
+        if min_x - margin <= x <= max_x + margin and min_z - margin <= z <= max_z + margin:
+            return False
+        
     return True
 
 def draw_trash():
@@ -627,7 +725,6 @@ def check_trash_in_front():
         dz = t["pos"][2] - player_pos[2]
         distance = math.hypot(dx, dz)
         
-        # Check if it's roughly in front (within 60 degrees of player direction) and close enough
         if distance < 50: 
             angle_to_trash = math.atan2(dz, dx)
             player_angle_rad = math.atan2(player_dir[1], player_dir[0])
@@ -638,14 +735,14 @@ def check_trash_in_front():
                 break
 
 
-
 glutInit()
 glutInitDisplayMode(GLUT_DOUBLE|GLUT_RGB|GLUT_DEPTH)
 glutInitWindowSize(1000,800)
-glutCreateWindow(b"Bullet Frenzy - Alternative Implementation")
+glutCreateWindow(b"ECO GUARDIAN")
 glClearColor(0,0,0,1)
 glEnable(GL_DEPTH_TEST)
 update_player_dir()
+generate_maze()#drawingmazeinopenspace
 generate_trash(n=20)#drawingtrash
 glutDisplayFunc(showScreen)
 glutKeyboardFunc(keyboardListener)
