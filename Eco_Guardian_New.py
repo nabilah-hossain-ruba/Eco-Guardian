@@ -328,63 +328,79 @@ def draw_cube_bin(color):
 
 
 
+# =================================....DRAW DUSTBIN...=================================
+def draw_cylinder_bin(color, top, bottom, hei):
+    glPushMatrix()
+    glColor3f(*color)  
+    glRotatef(-90, 1, 0, 0)  # Stand upright
+    gluCylinder(gluNewQuadric(), top, bottom, hei, 20, 20)
+    glPopMatrix()
+
+
+def draw_cube_bin(color):
+    glPushMatrix()
+    glColor3f(*color)         
+    glutSolidCube(45)          # Cube base for the bin
+    glPopMatrix()
+
+
+# ======================= BINS ==========================
+bins = [
+    {"type": "PAPER", "pos": (-1200, 30, 450), "color": ([0.6, 0.6, 0.7], [0.33, 0.6, .5])},           # grey / Greenish
+    {"type": "PLASTIC", "pos": (0, 30, 1200), "color": ([0.9, 0.0, 0.9], [1.0, 0.6, 1.0])},            # Purple / Pink
+    {"type": "GLASS", "pos": (1200, 30, 450), "color": ([0.0, 0.5, 0.0], [0.5, 1.0, 0.5])},            # Dark / Light Green
+    {"type": "METAL", "pos": (-0, 30, -1200), "color": ([0.8, 0.8, 0.8], [0.9, 0.9, 0.9])},          # Silver
+    {"type": "BIODEGRADABLE", "pos": (1200, 30, -450), "color": ([0.55, 0.27, 0.07], [0.82, 0.71, 0.55])} # Brown / Beige
+]
+
+def get_text_width(text, font=GLUT_BITMAP_HELVETICA_18):
+    label = b["type"]
+
+def draw_bin_body(x, y, z, cube_color, cyl_color, label="BIN"):
+    # Cube base
+    glPushMatrix()
+    glTranslatef(x, y, z)
+    draw_cube_bin(cube_color)
+    glPopMatrix()
+
+    # Cylinder top (bin opening)
+    glPushMatrix()
+    glTranslatef(x, y + 25, z)
+    draw_cylinder_bin(cyl_color, 20, 18, 22)
+    glPopMatrix()
+
+    # Draw bin type label above the bin
+    glPushMatrix()
+    glColor3f(0.9, 0.34, 0.9)  # Purple/pink text
+    glRasterPos3f(x - 15, y + 50, z)  # adjust -15 to roughly center
+    for ch in label:
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(ch))
+    glPopMatrix()
+
 def draw_bins():
-    # Paper bin (Pink)
-    glPushMatrix()
-    glTranslatef(-50, 30, 1200)
-    draw_cube_bin([1.0, 0.078, 0.576])
-    glPopMatrix()
+    for b in bins:
+        draw_bin_body(
+            b["pos"][0], b["pos"][1], b["pos"][2],
+            b["color"][0], b["color"][1],
+            label=b["type"]  
+        )
 
-    glPushMatrix()
-    glTranslatef(-50, 52, 1200)
-    draw_cylinder_bin([1.0, 0.81, 0.91], 22, 15, 20)
-    glPopMatrix()
+# ============== Bin Interaction ===================
+current_bin = None
+inventory = []
+inventory_limit = 5
+current_inventory_index = 0
 
-
-    # Plastic (Green)
-    glPushMatrix()
-    glTranslatef(50, 30, 1200)
-    draw_cube_bin([0.0, 0.39, 0.0])
-    glPopMatrix()
-
-    glPushMatrix()
-    glTranslatef(50, 52, 1200)
-    draw_cylinder_bin([0.56, 0.93, 0.56], 22, 15, 20)
-    glPopMatrix()
-
-
-    # Kitchen (Blue)
-    glPushMatrix()
-    glTranslatef(-50, 30, -1200)
-    draw_cube_bin([0, 0, 0.9])
-    glPopMatrix()
-
-    glPushMatrix()
-    glTranslatef(-50, 52, -1200)
-    draw_cylinder_bin([0.33, 0.75, 0.88], 22, 15, 20)
-    glPopMatrix()
-
-
-    # Metal (Red)
-    glPushMatrix()
-    glTranslatef(50, 30, -1200)
-    draw_cube_bin([0.9, 0.0, 0.0])
-    glPopMatrix()
-
-    glPushMatrix()
-    glTranslatef(50, 52, -1200)
-    draw_cylinder_bin([0.95, 0.65, 0.65], 22, 15, 20)
-    glPopMatrix()
-
-
-#===========================...DRAW HOUSE...=================================
-# def draw_square():
-#     glPushMatrix()
-#     glColor3f(1, 1, 0)        # Yellow
-#     glTranslatef(-650, 0, 900)
-#     glScalef(6, 4, 3)       # Flatten cube into a square plate
-#     glutSolidCube(50)
-#     glPopMatrix()
+def check_bin_in_front():
+    global current_bin
+    current_bin = None
+    for b in bins:
+        bx, by, bz = b["pos"]
+        dist = math.hypot(player_pos[0] - bx, player_pos[2] - bz)
+        if dist < 80:   # proximity threshold
+            current_bin = b
+            break
+#===================== . . up . . =====================================
 
 
 # =====================...DRAW LAMP...==================================
@@ -440,7 +456,7 @@ def check_collisions():
 
 def keyboardListener(key,x,y):
     global gun_angle, cheat_mode, auto_camera, player_pos, fp_cam_yaw
-    global current_trash, inventory, inventory_message, inventory_message_time
+    global current_trash, inventory, inventory_message, inventory_message_time, current_inventory_index
     key=key.decode("utf-8").lower()
     if game_over:
         if key=="r": reset_game(); return
@@ -496,6 +512,24 @@ def keyboardListener(key,x,y):
             print("Inventory full!")
             inventory_message = "Inventory full!"
             inventory_message_time = time.time()
+    # ================================= dump trash =====================================
+    elif key == "m" and current_bin and inventory:
+        item = inventory[current_inventory_index]
+        print(f"Dumped {item} into {current_bin['type']} bin")
+        inventory_message = f"Dumped {item} into {current_bin['type']} bin"
+        inventory_message_time = time.time()
+        inventory.pop(current_inventory_index)
+        if inventory:
+            current_inventory_index %= len(inventory)
+        else:
+            current_inventory_index = 0
+
+    # ================================= cycle inventory =====================================
+    elif key == "\t" and inventory:   # using TAB (Shift alternative)
+        current_inventory_index = (current_inventory_index + 1) % len(inventory)
+        print(f"Selected inventory item: {inventory[current_inventory_index]}")
+        inventory_message = f"Selected: {inventory[current_inventory_index]}"
+        inventory_message_time = time.time()
 #====================================================================================
 
 
@@ -593,7 +627,13 @@ def showScreen():
     else:
         draw_text(10, glutGet(GLUT_WINDOW_HEIGHT) - 20,
                   f"GAME OVER. Score {score}. Press R.")
-    
+    # Bin interaction
+    if current_bin and inventory:
+        draw_text(10, glutGet(GLUT_WINDOW_HEIGHT) - 110,
+                  f"Press M to dump trash (from inventory) into {current_bin['type']} bin")
+        draw_text(10, glutGet(GLUT_WINDOW_HEIGHT) - 130,
+                  "Press TAB to toggle between trashes inside inventory")
+
 
     # Trash collection
     if current_trash:
@@ -623,6 +663,7 @@ def idle():
     if not game_over:
         check_collisions()
         check_trash_in_front() #updated to view trash
+        check_bin_in_front() #for bins
     glutPostRedisplay()
 
 def reset_game():
