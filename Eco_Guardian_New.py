@@ -31,6 +31,7 @@ missed_bullets = 0
 score = 0
 game_over = False
 
+
 grid_length = 1250
 enemy_speed = 0.03
 bullet_speed = 5
@@ -57,10 +58,10 @@ def update_player_dir():
 
 
 def draw_text(x, y, text):
-    glColor3f(1, 1, 1)
-    glWindowPos2f(x, y)
+    glRasterPos2f(x, y)
     for ch in text:
-        	glutBitmapCharacter(FONT, ord(ch))
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(ch))
+
 
 
 def draw_player():
@@ -349,7 +350,7 @@ def check_collisions():
 
 def keyboardListener(key,x,y):
     global gun_angle, cheat_mode, auto_camera, player_pos, fp_cam_yaw
-    global current_trash, inventory
+    global current_trash, inventory, inventory_message, inventory_message_time
     key=key.decode("utf-8").lower()
     if game_over:
         if key=="r": reset_game(); return
@@ -398,9 +399,13 @@ def keyboardListener(key,x,y):
             inventory.append(current_trash["name"])
             trash_items.remove(current_trash)
             print(f"Collected: {current_trash['name']}")
+            inventory_message = f"Collected: {current_trash['name']}"
+            inventory_message_time = time.time()
             current_trash = None
         else:
             print("Inventory full!")
+            inventory_message = "Inventory full!"
+            inventory_message_time = time.time()
 #====================================================================================
 
 
@@ -493,18 +498,24 @@ def showScreen():
     # Draw HUD text
     if not game_over:
         draw_text(10, glutGet(GLUT_WINDOW_HEIGHT) - 20,
-                  f"Life:{life} Score:{score} Missed:{missed_bullets}")
+                f"Life:{life} Score:{score} Missed:{missed_bullets}")
     else:
         draw_text(10, glutGet(GLUT_WINDOW_HEIGHT) - 20,
                   f"GAME OVER. Score {score}. Press R.")
+    
 
     # Trash collection
     if current_trash:
         draw_text(10, glutGet(GLUT_WINDOW_HEIGHT) - 50,
                   f"Press N to collect trash; Name: {current_trash['name']}")
+        
+    # Notification (shows for 2 seconds then disappears)
+    if inventory_message and (time.time() - inventory_message_time) < 2:
+        draw_text(10, glutGet(GLUT_WINDOW_HEIGHT) -70, inventory_message)
 
-    # Inventory display
-    draw_text(10, glutGet(GLUT_WINDOW_HEIGHT) - 80,
+
+    # Inventory display                
+    draw_text(10, glutGet(GLUT_WINDOW_HEIGHT) - 90,
               "Inventory: " + ", ".join(inventory))
 
     # Restore previous projection/modelview
@@ -516,7 +527,7 @@ def showScreen():
     glEnable(GL_DEPTH_TEST)
     glutSwapBuffers()
 
-#==========================================================================
+#=====================================up=====================================
 def idle():
     if not game_over:
         check_collisions()
@@ -603,7 +614,10 @@ def draw_trash():
 # =======================...TRASH COLLECT...==================================
 inventory = []          # Holds collected trash
 inventory_limit = 5     # Max trash the player can carry
-current_trash = None    
+current_trash = None   
+inventory_message = ""
+inventory_message_time = 0
+
 
 def check_trash_in_front():
     global current_trash
