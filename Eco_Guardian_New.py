@@ -41,7 +41,7 @@ road_width = 200
 # Movement state tracking
 movement_keys = {"w": False, "s": False, "a": False, "d": False}
 movement_speed = 3
-rotation_speed = 1.5
+rotation_speed = 1
 
 def update_player_dir():
     global player_dir
@@ -150,17 +150,26 @@ def draw_player():
     glPushMatrix()
     glTranslatef(0, torso_y + 20, 0)
     glColor3f(0.9, 0.75, 0.65)
-    glScalef(10, 8, 15)
+    glScalef(10, 8, 10)
     glutSolidCube(1)
     glPopMatrix()
 
-    
+    # HEAD
     if camera_mode != 'first':
         glPushMatrix()
         glTranslatef(0, head_y, 0)
-        glColor3f(0, 0, 0)
+        glColor3f(0.957, 0.743, 0.576)
         glutSolidSphere(12, 20, 20)
         glPopMatrix()
+
+    # HAT
+    glPushMatrix()
+    glColor3f(0.545, 0.271, 0.075)  
+    glTranslatef(0, head_y + 10, 0)
+    glRotatef(-90, 1, 0, 0)  
+    gluCylinder(gluNewQuadric(), 20, 0, 20, 20, 20)
+    glPopMatrix()
+    
      
     # Arms
     glPushMatrix()
@@ -405,8 +414,8 @@ def draw_bin_body(x, y, z, cube_color, cyl_color, label="BIN"):
 
     # Draw bin type label above the bin
     glPushMatrix()
-    glColor3f(0.9, 0.34, 0.9)  # Purple/pink text
-    glRasterPos3f(x - 15, y + 50, z)  # adjust -15 to roughly center
+    glColor3f(1, 1, 1)  # Purple/pink text
+    glRasterPos3f(x - 30, y + 60, z)  
     for ch in label:
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(ch))
     glPopMatrix()
@@ -648,13 +657,10 @@ def showScreen():
 
     # ===== 2D HUD =====
     glDisable(GL_DEPTH_TEST)
-
-    # Switch to 2D rendering
     glMatrixMode(GL_PROJECTION)
     glPushMatrix()
     glLoadIdentity()
     gluOrtho2D(0, glutGet(GLUT_WINDOW_WIDTH), 0, glutGet(GLUT_WINDOW_HEIGHT))
-
     glMatrixMode(GL_MODELVIEW)
     glPushMatrix()
     glLoadIdentity()
@@ -830,7 +836,6 @@ def is_position_free(x, z, margin=25):
     return True
 
 def is_near_wall_segment(px, pz, x1, z1, x2, z2, margin):
-    """Check if point (px, pz) is within margin distance of wall segment from (x1,z1) to (x2,z2)"""
     # Calculate distance from point to line
     
     # Vector from start to end of wall
