@@ -73,7 +73,7 @@ def draw_player():
     # BODY
     glPushMatrix()
     glTranslatef(0, torso_y, 0)
-    glColor3f(0, 0.3, 0)
+    glColor3f(0, 0, 0.3)
     glScalef(30, Torso_Height, 15)
     glutSolidCube(1)
     glPopMatrix()
@@ -314,7 +314,7 @@ def draw_home_boundary():
 def draw_cylinder_bin(color, top, bottom, hei):
     glPushMatrix()
     glColor3f(*color)  
-    glRotatef(-90, 1, 0, 0)  # Stand upright
+    glRotatef(-90, 1, 0, 0)  
     gluCylinder(gluNewQuadric(), top, bottom, hei, 20, 20)
     glPopMatrix()
 
@@ -322,7 +322,7 @@ def draw_cylinder_bin(color, top, bottom, hei):
 def draw_cube_bin(color):
     glPushMatrix()
     glColor3f(*color)         
-    glutSolidCube(45)          # Cube base for the bin
+    glutSolidCube(45)  # Cube base for the bin
     glPopMatrix()
 
 
