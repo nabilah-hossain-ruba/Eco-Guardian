@@ -29,9 +29,9 @@ game_over = False
 
 grid_length = 1250
 player_margin = 30  
-Torso_Height = 26      
-leg_top_radius = 6.0
-leg_bottom_radius = 2.5
+Torso_Height = 30      
+leg_top_radius = 5.5
+leg_bottom_radius = 3.5
 Cam_Min_Hei = 80   
 Cam_Max_Hei = 1200  
 fov_first = 60
@@ -135,20 +135,26 @@ def draw_player():
     glPushMatrix()
     glTranslatef(player_pos[0], player_pos[1], player_pos[2])
     glRotatef(player_angle, 0, 1, 0)
-    if game_over:
-        glRotatef(90, 1, 0, 0)
-    torso_y = 30 if not game_over else 12
-    head_y  = 60 if not game_over else 25  
+    torso_y = 35 
+    head_y  = 65  
 
-    # Torso
+    # Torso # BODY
     glPushMatrix()
     glTranslatef(0, torso_y, 0)
-    glColor3f(0, 0.3, 0)
+    glColor3f(0, 0, 0.3)
     glScalef(30, Torso_Height, 15)
     glutSolidCube(1)
     glPopMatrix()
 
-    # Head
+    # NECK
+    glPushMatrix()
+    glTranslatef(0, torso_y + 20, 0)
+    glColor3f(0.9, 0.75, 0.65)
+    glScalef(10, 8, 15)
+    glutSolidCube(1)
+    glPopMatrix()
+
+    
     if camera_mode != 'first':
         glPushMatrix()
         glTranslatef(0, head_y, 0)
@@ -158,7 +164,7 @@ def draw_player():
      
     # Arms
     glPushMatrix()
-    arm_y = 45 if not game_over else torso_y + 10  
+    arm_y = 50
     skin = (0.9, 0.75, 0.65)
     for side in (-1, 1):
         glPushMatrix()
@@ -170,9 +176,9 @@ def draw_player():
         glPopMatrix()
     glPopMatrix()
 
-    # Legs
-    leg_y = 20 if not game_over else torso_y - 5
-    glColor3f(0, 0, 0.5)
+    # LEGS 
+    leg_y = 20 
+    glColor3f(0, 0, 0)
     for x_off in (-10, 10):
         glPushMatrix()
         glTranslatef(x_off, leg_y, 0)
@@ -356,29 +362,11 @@ def draw_home_boundary():
     draw_wall(100, -350, 100, 0, h, (0.96, 0.64, 0.35))   
 
 
-
-# =================================....DRAW DUSTBIN...=================================
-def draw_cylinder_bin(color, top, bottom, hei):
-    glPushMatrix()
-    glColor3f(color[0], color[1], color[2])  
-    glRotatef(-90, 1, 0, 0)  # Rotate so cylinder stands up
-    gluCylinder(gluNewQuadric(), top, bottom, hei, 20, 20)
-    glPopMatrix()
-
-
-def draw_cube_bin(color):
-    glPushMatrix()
-    glColor3f(color[0], color[1], color[2])         
-    glutSolidCube(45)          # Cube as the bin body
-    glPopMatrix()
-
-
-
 # =================================....DRAW DUSTBIN...=================================
 def draw_cylinder_bin(color, top, bottom, hei):
     glPushMatrix()
     glColor3f(*color)  
-    glRotatef(-90, 1, 0, 0)  # Stand upright
+    glRotatef(-90, 1, 0, 0)  
     gluCylinder(gluNewQuadric(), top, bottom, hei, 20, 20)
     glPopMatrix()
 
@@ -386,7 +374,7 @@ def draw_cylinder_bin(color, top, bottom, hei):
 def draw_cube_bin(color):
     glPushMatrix()
     glColor3f(*color)         
-    glutSolidCube(45)          # Cube base for the bin
+    glutSolidCube(45)  # Cube base for the bin
     glPopMatrix()
 
 
@@ -651,7 +639,6 @@ def showScreen():
     draw_grid()
     draw_road()
     draw_bins()
-    # draw_square()
     draw_home_boundary()
     set_lamp()
     draw_boundaries()
@@ -705,7 +692,7 @@ def showScreen():
     draw_minimap()
 
     # Restore previous projection/modelview
-    glPopMatrix()  # MODELVIEW
+    glPopMatrix() 
     glMatrixMode(GL_PROJECTION)
     glPopMatrix()
     glMatrixMode(GL_MODELVIEW)
@@ -874,7 +861,7 @@ def draw_trash():
     if not trash_items:
         return
 
-    quad = gluNewQuadric()  # Create one quadric for all cylinders
+    quad = gluNewQuadric() 
     for t in trash_items:
         glPushMatrix()
         glTranslatef(t["pos"][0], t["size"]/2, t["pos"][2])
@@ -885,7 +872,7 @@ def draw_trash():
             glScalef(t["size"], t["size"], t["size"])
             glutSolidCube(1)
             glPopMatrix()
-        else:  # Cylinder
+        else:  
             glPushMatrix()
             glRotatef(-90, 1, 0, 0)
             gluCylinder(quad, t["size"]/2, t["size"]/2, t["size"], 12, 12)
