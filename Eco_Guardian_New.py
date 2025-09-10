@@ -11,37 +11,24 @@ except Exception:
 
 
 player_pos = [0, 0, 0]
-initial_Gun_Angle = 180
-gun_angle = initial_Gun_Angle
+initial_Player_Angle = 180
+player_angle = initial_Player_Angle
 player_dir = [0, 1]  
 
 camera_mode = "third"
-camera_distance = 500
-camera_height = 500
+camera_distance = 200
+camera_height = 150
 camera_angle = 0
 
-cheat_mode = False
 auto_camera = False
 fp_cam_yaw = 0.0  
-bullets = []
-enemies = []
 
-life = 5
-missed_bullets = 0
 score = 0
 game_over = False
 
 
 grid_length = 1250
-enemy_speed = 0.03
-bullet_speed = 5
-last_fire_time = time.time()
 player_margin = 30  
-cheat_speed = 2
-cheat_path = 35 
-cheat_coolDown = 0.12
-Muzzle_Forward = 48.0  
-Muzzle_Height = 40.0   
 Torso_Height = 26      
 leg_top_radius = 6.0
 leg_bottom_radius = 2.5
@@ -51,9 +38,14 @@ fov_first = 60
 fov_third = 82  
 road_width = 200
 
+# Movement state tracking
+movement_keys = {"w": False, "s": False, "a": False, "d": False}
+movement_speed = 3
+rotation_speed = 1.5
+
 def update_player_dir():
     global player_dir
-    rad = math.radians(gun_angle)
+    rad = math.radians(player_angle)
     player_dir = [math.sin(rad), math.cos(rad)]
 
 
@@ -63,16 +55,92 @@ def draw_text(x, y, text):
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(ch))
 
 
+def draw_minimap():
+    map_size = 150
+    map_x = glutGet(GLUT_WINDOW_WIDTH) - map_size - 10
+    map_y = glutGet(GLUT_WINDOW_HEIGHT) - map_size - 10
+    
+    # Draw background
+    glColor3f(0.2, 0.2, 0.2)
+    glBegin(GL_QUADS)
+    glVertex2f(map_x, map_y)
+    glVertex2f(map_x + map_size, map_y)
+    glVertex2f(map_x + map_size, map_y + map_size)
+    glVertex2f(map_x, map_y + map_size)
+    glEnd()
+    
+    # Draw border
+    glColor3f(1.0, 1.0, 1.0)
+    glLineWidth(2)
+    glBegin(GL_LINE_LOOP)
+    glVertex2f(map_x, map_y)
+    glVertex2f(map_x + map_size, map_y)
+    glVertex2f(map_x + map_size, map_y + map_size)
+    glVertex2f(map_x, map_y + map_size)
+    glEnd()
+    
+    scale = map_size / (2 * grid_length)
+    
+    def world_to_minimap(world_x, world_z):
+        map_pixel_x = map_x + (-world_x + grid_length) * scale
+        map_pixel_y = map_y + (-world_z + grid_length) * scale
+        return map_pixel_x, map_pixel_y
+    
+    # Draw bins
+    glColor3f(0.0, 1.0, 0.0)
+    glPointSize(6)
+    glBegin(GL_POINTS)
+    for bin_item in bins:
+        bx, by, bz = bin_item["pos"]
+        px, py = world_to_minimap(bx, bz)
+        glVertex2f(px, py)
+    glEnd()
+    
+    # Draw trash
+    glColor3f(1.0, 0.0, 0.0)
+    glPointSize(4)
+    glBegin(GL_POINTS)
+    for trash in trash_items:
+        tx, ty, tz = trash["pos"]
+        px, py = world_to_minimap(tx, tz)
+        glVertex2f(px, py)
+    glEnd()
+    
+    # Draw player
+    px, py = world_to_minimap(player_pos[0], player_pos[2])
+    
+    triangle_size = 4
+    angle_rad = math.radians(player_angle + 90)
+    
+    front_x = px + math.cos(angle_rad) * triangle_size
+    front_y = py + math.sin(angle_rad) * triangle_size
+    
+    left_x = px + math.cos(angle_rad + 2.4) * triangle_size * 0.7
+    left_y = py + math.sin(angle_rad + 2.4) * triangle_size * 0.7
+    
+    right_x = px + math.cos(angle_rad - 2.4) * triangle_size * 0.7
+    right_y = py + math.sin(angle_rad - 2.4) * triangle_size * 0.7
+    
+    glColor3f(1.0, 1.0, 0.0)
+    glBegin(GL_TRIANGLES)
+    glVertex2f(front_x, front_y)
+    glVertex2f(left_x, left_y)
+    glVertex2f(right_x, right_y)
+    glEnd()
+    
+    glLineWidth(1)
+
+
 def draw_player():
     glPushMatrix()
     glTranslatef(player_pos[0], player_pos[1], player_pos[2])
-    glRotatef(gun_angle, 0, 1, 0)
+    glRotatef(player_angle, 0, 1, 0)
     if game_over:
         glRotatef(90, 1, 0, 0)
     torso_y = 30 if not game_over else 12
     head_y  = 60 if not game_over else 25  
 
-   
+    # Torso
     glPushMatrix()
     glTranslatef(0, torso_y, 0)
     glColor3f(0, 0.3, 0)
@@ -80,7 +148,7 @@ def draw_player():
     glutSolidCube(1)
     glPopMatrix()
 
-    
+    # Head
     if camera_mode != 'first':
         glPushMatrix()
         glTranslatef(0, head_y, 0)
@@ -88,6 +156,7 @@ def draw_player():
         glutSolidSphere(12, 20, 20)
         glPopMatrix()
      
+    # Arms
     glPushMatrix()
     arm_y = 45 if not game_over else torso_y + 10  
     skin = (0.9, 0.75, 0.65)
@@ -97,19 +166,11 @@ def draw_player():
         glColor3f(*skin)
         glutSolidSphere(4, 10, 10)
         quad = gluNewQuadric()
-        gluCylinder(quad, 3, 3, 35, 10, 10)
+        gluCylinder(quad, 3, 3, 25, 10, 10)
         glPopMatrix()
- 
-    glPushMatrix()
-    glTranslatef(0, arm_y, 7.6)  
-    glColor3f(0.5, 0.5, 0.5)
-    quad = gluNewQuadric()
-    # Tapered gun
-    gluCylinder(quad, 4.5, 2, 40, 16, 8)
-    glPopMatrix()
     glPopMatrix()
 
-    # Static legs 
+    # Legs
     leg_y = 20 if not game_over else torso_y - 5
     glColor3f(0, 0, 0.5)
     for x_off in (-10, 10):
@@ -145,25 +206,24 @@ def draw_road():
     glVertex3f((road_width / 2), 2, grid_length)
     glVertex3f(-(road_width / 2), 2, grid_length)
     
-    glVertex3f(-grid_length, 2, 350)   # bottom-left
-    glVertex3f(-(road_width / 2), 2, 350)    # bottom-right
-    glVertex3f(-(road_width / 2), 2, 550)    # top-right
-    glVertex3f(-grid_length, 2, 550)   # top-left
+    glVertex3f(-grid_length, 2, 350)
+    glVertex3f(-(road_width / 2), 2, 350)
+    glVertex3f(-(road_width / 2), 2, 550)
+    glVertex3f(-grid_length, 2, 550)
 
-
-    glVertex3f(-grid_length, 2, -350)   # bottom-left
-    glVertex3f(-(road_width / 2), 2, -350)    # bottom-right
-    glVertex3f(-(road_width / 2), 2, -550)    # top-right
+    glVertex3f(-grid_length, 2, -350)
+    glVertex3f(-(road_width / 2), 2, -350)
+    glVertex3f(-(road_width / 2), 2, -550)
     glVertex3f(-grid_length, 2, -550)
 
-    glVertex3f(grid_length, 2, 350)   # bottom-left
-    glVertex3f((road_width / 2), 2, 350)    # bottom-right
-    glVertex3f((road_width / 2), 2, 550)    # top-right
+    glVertex3f(grid_length, 2, 350)
+    glVertex3f((road_width / 2), 2, 350)
+    glVertex3f((road_width / 2), 2, 550)
     glVertex3f(grid_length, 2, 550)
 
-    glVertex3f(grid_length, 2, -350)   # bottom-left
-    glVertex3f((road_width / 2), 2, -350)    # bottom-right
-    glVertex3f((road_width / 2), 2, -550)    # top-right
+    glVertex3f(grid_length, 2, -350)
+    glVertex3f((road_width / 2), 2, -350)
+    glVertex3f((road_width / 2), 2, -550)
     glVertex3f(grid_length, 2, -550)
     glEnd()
     
@@ -178,14 +238,13 @@ def draw_wall(x1,z1,x2,z2,h,color):
     glEnd()
 
 def draw_boundaries():
-    # Outside grid
     h=100 
     draw_wall(-grid_length,-grid_length, -grid_length, grid_length, h,(0.96, 0.64, 0.35))
     draw_wall(-grid_length,grid_length, grid_length,grid_length, h,(0.96, 0.64, 0.35))
     draw_wall(grid_length,grid_length, grid_length,-grid_length, h,(0.96, 0.64, 0.35))
     draw_wall(grid_length,-grid_length,-grid_length,-grid_length,h,(0.96, 0.64, 0.35))
 
-#===========================. . .maze in open space. . .=======================
+# Maze generation
 def generate_maze():
     global maze_walls
     maze_walls = []
@@ -197,11 +256,9 @@ def generate_maze():
     road = road_width
     offset = 100
 
-    # Open space sizes
     open_width = (2 * half_grid - road) / 2
     open_height = (2 * half_grid - 2 * road) / 3
 
-    # Centers of open spaces
     x_centers = [-open_width / 2, open_width / 2 + road]
     z_centers = [half_grid - open_height / 2,
                  half_grid - open_height - road - open_height / 2,
@@ -209,20 +266,17 @@ def generate_maze():
 
     for zc in z_centers:
         for xc in x_centers:
-            # Calculate dynamic maze rows/cols to fully fill open space
             maze_cols = max(1, int(open_width // min_cell_size))
             maze_rows = max(1, int(open_height // min_cell_size))
             maze_cell_size_x = open_width / maze_cols
             maze_cell_size_z = open_height / maze_rows
 
-            # Start coordinates (top-left) with offset applied
             start_x = xc - open_width / 2 - offset
             start_z = zc - open_height / 2
 
-            # Initialize cells [visited, top, right, bottom, left]
             grid = [[[False, True, True, True, True] for _ in range(maze_cols)] for _ in range(maze_rows)]
 
-            # Iterative carving
+            # Generate maze
             stack = [(maze_rows // 2, maze_cols // 2)]
             grid[maze_rows // 2][maze_cols // 2][0] = True
             while stack:
@@ -233,7 +287,6 @@ def generate_maze():
                 for dr, dc in dirs:
                     nr, nc = r + dr, c + dc
                     if 0 <= nr < maze_rows and 0 <= nc < maze_cols and not grid[nr][nc][0]:
-                        # Remove walls
                         if dr == 1:
                             grid[r][c][3] = False
                             grid[nr][nc][1] = False
@@ -253,7 +306,7 @@ def generate_maze():
                 if not moved:
                     stack.pop()
 
-            # Convert walls to coordinates (skip outer border walls)
+            # Convert to walls
             for r in range(maze_rows):
                 for c in range(maze_cols):
                     x1 = start_x + c * maze_cell_size_x
@@ -261,7 +314,6 @@ def generate_maze():
                     x2 = x1 + maze_cell_size_x
                     z2 = z1 + maze_cell_size_z
 
-                    # Only internal walls
                     if r > 0 and grid[r][c][1]:
                         maze_walls.append([x1, z1, x2, z1, h, color])
                     if c < maze_cols - 1 and grid[r][c][2]:
@@ -277,30 +329,24 @@ def draw_maze():
         x1, z1, x2, z2, h, color = wall
         draw_wall(x1, z1, x2, z2, h, color)
 
-#=========================up====================================
-
 
 def draw_home_boundary():
     h = 100
     x1, z1, x2, z2 = grid_length, 550, road_width/2, 350
 
-    # Left bottom road
+    # Left roads
     draw_wall(-x1, z1, -x2, z1, h, (0.96, 0.64, 0.35)) 
     draw_wall(-x1, z2, -x2, z2, h, (0.96, 0.64, 0.35))
-
-    # Left top road
     draw_wall(-x1, -z1, -x2, -z1, h, (0.96, 0.64, 0.35)) 
     draw_wall(-x1, -z2, -x2, -z2, h, (0.96, 0.64, 0.35))  
 
-    # Right bottom road
+    # Right roads
     draw_wall(x1, z1, x2, z1, h, (0.96, 0.64, 0.35)) 
     draw_wall(x1, z2, x2, z2, h, (0.96, 0.64, 0.35))
-
-    # Right top road
     draw_wall(x1, -z1, x2, -z1, h, (0.96, 0.64, 0.35)) 
     draw_wall(x1, -z2, x2, -z2, h, (0.96, 0.64, 0.35)) 
 
-    # Centre Road walls
+    # Center walls
     draw_wall(-100, grid_length, -100, 900, h, (0.96, 0.64, 0.35)) 
     draw_wall(100, grid_length, 100, 900, h, (0.96, 0.64, 0.35))
     draw_wall(-100, -grid_length, -100, -900, h, (0.96, 0.64, 0.35))
@@ -354,7 +400,7 @@ bins = [
 ]
 
 def get_text_width(text, font=GLUT_BITMAP_HELVETICA_18):
-    label = b["type"]
+    return len(text) * 10  # Approximate width
 
 def draw_bin_body(x, y, z, cube_color, cyl_color, label="BIN"):
     # Cube base
@@ -388,7 +434,7 @@ def draw_bins():
 # ============== Bin Interaction ===================
 current_bin = None
 inventory = []
-inventory_limit = 5
+inventory_limit = 3
 current_inventory_index = 0
 
 def check_bin_in_front():
@@ -397,7 +443,10 @@ def check_bin_in_front():
     for b in bins:
         bx, by, bz = b["pos"]
         dist = math.hypot(player_pos[0] - bx, player_pos[2] - bz)
-        if dist < 80:   # proximity threshold
+        # Interaction range that works with collision system
+        # Player gets stopped at ~50 units (25 margin + 25 bin_radius)
+        # So interaction should trigger at around 55-60 units
+        if dist < 65:   # Allows interaction when player hits collision boundary
             current_bin = b
             break
 #===================== . . up . . =====================================
@@ -437,67 +486,29 @@ def set_lamp():
 
 
 def check_collisions():
-    global score, life, game_over
-    for b in bullets[:]:
-        for e in enemies:
-            if math.hypot(b["pos"][0]-e["pos"][0], b["pos"][2]-e["pos"][2])<50:
-                score+=1; bullets.remove(b)
-                e["pos"]=[random.randint(-400,400),0,random.randint(-400,400)]
-                break
-    for e in enemies:
-        if math.hypot(player_pos[0]-e["pos"][0], player_pos[2]-e["pos"][2])<50:
-            life-=1
-            print(f"Remaining life: {life} (collision)")
-            e["pos"]=[random.randint(-400,400),0,random.randint(-400,400)]
-            if life<=0:
-                game_over=True
-                print("Game Over (life depleted)")
+    # Function kept for future use but currently empty
+    pass
 
 
 def keyboardListener(key,x,y):
-    global gun_angle, cheat_mode, auto_camera, player_pos, fp_cam_yaw
+    global player_angle, auto_camera, player_pos, fp_cam_yaw
     global current_trash, inventory, inventory_message, inventory_message_time, current_inventory_index
+    global movement_keys, camera_mode, score
     key=key.decode("utf-8").lower()
     if game_over:
         if key=="r": reset_game(); return
         return  
-    if key=="w": 
-        #player_pos[0]+=player_dir[0]*10; player_pos[2]+=player_dir[1]*10
-        #[uporer line gulai variable e rakhse]
-#==================================check_collision with trash=====================================
-        new_x = player_pos[0] + player_dir[0]*10 
-        new_z = player_pos[2] + player_dir[1]*10
-        if is_position_free(new_x, new_z, margin=20):
-            player_pos[0] = new_x
-            player_pos[2] = new_z
-#=================================================================================================
-    elif key=="s": 
-        #player_pos[0]-=player_dir[0]*10; player_pos[2]-=player_dir[1]*10
-        # [uporer line gulai variable e rakhse]
-#==================================check_collision with trash=====================================
-        new_x = player_pos[0] - player_dir[0]*10
-        new_z = player_pos[2] - player_dir[1]*10
-        if is_position_free(new_x, new_z, margin=20):
-            player_pos[0] = new_x
-            player_pos[2] = new_z       
-#=================================================================================================
-    elif key=="a": 
-        gun_angle+=5; update_player_dir()
-    elif key=="d": 
-        gun_angle-=5; update_player_dir()
-    elif key=="c":
-        cheat_mode = not cheat_mode
-        print('Cheat Mode:', 'ON' if cheat_mode else 'OFF')
-        if cheat_mode and camera_mode == "first":
-            auto_camera = False 
-            fp_cam_yaw = gun_angle
+    
+    # Set movement flags for smooth movement
+    if key in movement_keys:
+        movement_keys[key] = True
+    elif key=="v":
+        # Toggle camera mode
+        if camera_mode=="third":
+            camera_mode="first"
         else:
-            auto_camera = False
-    elif key=="v" and cheat_mode and camera_mode=="first":
-        auto_camera = not auto_camera
-        if auto_camera:
-            fp_cam_yaw = gun_angle  
-        print('Auto Camera Follow:', 'ON' if auto_camera else 'OFF')
+            camera_mode="third"
+        print(f"Camera mode: {camera_mode.upper()}")
        
 # =================================key for collect =====================================
     elif key == "n" and current_trash:
@@ -515,8 +526,22 @@ def keyboardListener(key,x,y):
     # ================================= dump trash =====================================
     elif key == "m" and current_bin and inventory:
         item = inventory[current_inventory_index]
-        print(f"Dumped {item} into {current_bin['type']} bin")
-        inventory_message = f"Dumped {item} into {current_bin['type']} bin"
+        
+        # Check if trash belongs to the correct bin
+        trash_category = get_trash_category(item)
+        bin_type = current_bin['type']
+        
+        if trash_category == bin_type:
+            # Correct bin - increase score
+            score += 1
+            print(f"Correct! Dumped {item} into {bin_type} bin - Score: {score}")
+            inventory_message = f"Correct! +1 point - Score: {score}"
+        else:
+            # Wrong bin - decrease score (can go negative)
+            score -= 1
+            print(f"Wrong bin! {item} doesn't belong in {bin_type} bin - Score: {score}")
+            inventory_message = f"Wrong bin! -1 point - Score: {score}"
+            
         inventory_message_time = time.time()
         inventory.pop(current_inventory_index)
         if inventory:
@@ -532,34 +557,64 @@ def keyboardListener(key,x,y):
         inventory_message_time = time.time()
 #====================================================================================
 
+# Handle key release
+def keyboardUpListener(key, x, y):
+    global movement_keys
+    key = key.decode("utf-8").lower()
+    if key in movement_keys:
+        movement_keys[key] = False
 
+# Movement update function
+def update_movement():
+    global player_pos, player_angle
+    
+    if game_over:
+        return
+        
+    # Calculate movement
+    move_x, move_z = 0, 0
+    
+    if movement_keys["w"]:  # Forward
+        move_x += player_dir[0] * movement_speed
+        move_z += player_dir[1] * movement_speed
+    if movement_keys["s"]:  # Backward
+        move_x -= player_dir[0] * movement_speed
+        move_z -= player_dir[1] * movement_speed
+    if movement_keys["a"]:  # Rotate left
+        player_angle += rotation_speed
+        update_player_dir()
+    if movement_keys["d"]:  # Rotate right
+        player_angle -= rotation_speed
+        update_player_dir()
+    
+    # Apply movement
+    if move_x != 0 or move_z != 0:
+        new_x = player_pos[0] + move_x
+        new_z = player_pos[2] + move_z
+        if is_position_free(new_x, new_z, margin=20):
+            player_pos[0] = new_x
+            player_pos[2] = new_z
+    
+    # Keep player within bounds
     limit = grid_length - player_margin
     player_pos[0] = max(-limit, min(limit, player_pos[0]))
     player_pos[2] = max(-limit, min(limit, player_pos[2]))
 
 def specialKeyListener(key,x,y):
     global camera_height,camera_angle
-    if key==GLUT_KEY_UP: camera_height+=10
-    elif key==GLUT_KEY_DOWN: camera_height-=10
-    elif key==GLUT_KEY_LEFT: camera_angle+=5
-    elif key==GLUT_KEY_RIGHT: camera_angle-=5
-   
-    if camera_height < Cam_Min_Hei: camera_height = Cam_Min_Hei
-    if camera_height > Cam_Max_Hei: camera_height = Cam_Max_Hei
+    # Arrow keys only work in first person mode
+    if camera_mode == "first":
+        if key==GLUT_KEY_UP: camera_height+=10
+        elif key==GLUT_KEY_DOWN: camera_height-=10
+        elif key==GLUT_KEY_LEFT: camera_angle+=5
+        elif key==GLUT_KEY_RIGHT: camera_angle-=5
+       
+        if camera_height < Cam_Min_Hei: camera_height = Cam_Min_Hei
+        if camera_height > Cam_Max_Hei: camera_height = Cam_Max_Hei
 
 def mouseListener(button,state,x,y):
-    global camera_mode, fp_cam_yaw, auto_camera 
-    if button==GLUT_RIGHT_BUTTON and state==GLUT_DOWN:
-        if camera_mode=="third":
-            camera_mode="first"
-            if cheat_mode:
-                auto_camera = False
-                fp_cam_yaw = gun_angle
-        else:
-            camera_mode="third"
-            globals()['camera_angle'] = gun_angle
-            if globals()['camera_distance'] > 400: globals()['camera_distance'] = 320
-            if globals()['camera_height'] > 300: globals()['camera_height'] = 140
+    # Camera toggle handled by 'V' key
+    pass
 
 
 def setupCamera():
@@ -569,17 +624,14 @@ def setupCamera():
     gluPerspective(fov,aspect,0.1,2500)
     glMatrixMode(GL_MODELVIEW); glLoadIdentity()
     if camera_mode=="third":
-        cx = player_pos[0] + math.sin(math.radians(camera_angle)) * camera_distance
-        cz = player_pos[2] + math.cos(math.radians(camera_angle)) * camera_distance
+        # Third-person camera shows back of player (behind the player)
+        follow_angle = player_angle + 180  # Add 180 degrees to show back
+        cx = player_pos[0] + math.sin(math.radians(follow_angle)) * camera_distance
+        cz = player_pos[2] + math.cos(math.radians(follow_angle)) * camera_distance
         gluLookAt(cx, camera_height, cz, player_pos[0], player_pos[1]+50, player_pos[2], 0, 1, 0)
     else:
-        global fp_cam_yaw
-        if cheat_mode and not auto_camera:
-            yaw = fp_cam_yaw
-        else:
-            yaw = gun_angle
-            if cheat_mode and auto_camera:
-                fp_cam_yaw = yaw  
+        # First person camera
+        yaw = player_angle
         dir_x = math.sin(math.radians(yaw))
         dir_z = math.cos(math.radians(yaw))
         head_height = 60
@@ -610,7 +662,7 @@ def showScreen():
     # ===== 2D HUD =====
     glDisable(GL_DEPTH_TEST)
 
-    # Save and switch to orthographic projection
+    # Switch to 2D rendering
     glMatrixMode(GL_PROJECTION)
     glPushMatrix()
     glLoadIdentity()
@@ -623,7 +675,7 @@ def showScreen():
     # Draw HUD text
     if not game_over:
         draw_text(10, glutGet(GLUT_WINDOW_HEIGHT) - 20,
-                f"Life:{life} Score:{score} Missed:{missed_bullets}")
+                f"Score: {score}")
     else:
         draw_text(10, glutGet(GLUT_WINDOW_HEIGHT) - 20,
                   f"GAME OVER. Score {score}. Press R.")
@@ -649,6 +701,9 @@ def showScreen():
     draw_text(10, glutGet(GLUT_WINDOW_HEIGHT) - 90,
               "Inventory: " + ", ".join(inventory))
 
+    # Draw minimap
+    draw_minimap()
+
     # Restore previous projection/modelview
     glPopMatrix()  # MODELVIEW
     glMatrixMode(GL_PROJECTION)
@@ -661,19 +716,30 @@ def showScreen():
 #=====================================up=====================================
 def idle():
     if not game_over:
+        update_movement()  # Continuous movement
         check_collisions()
-        check_trash_in_front() #updated to view trash
-        check_bin_in_front() #for bins
+        check_trash_in_front() # View trash
+        check_bin_in_front() # For bins
     glutPostRedisplay()
 
 def reset_game():
-    global life,score,missed_bullets,game_over,bullets,gun_angle
-    life=5;score=0;missed_bullets=0;game_over=False;bullets.clear()
-    gun_angle=initial_Gun_Angle;update_player_dir()
+    global score, game_over, player_angle
+    score = 0
+    game_over = False
+    player_angle = initial_Player_Angle
+    update_player_dir()
     print('New game started')
 
 
 # =====================...TRASH GENERATION...==================================
+
+def get_trash_category(trash_name):
+    """Find which category a trash item belongs to"""
+    for category, items in trash_types.items():
+        for item_name, color in items:
+            if item_name == trash_name:
+                return category
+    return None  # Unknown trash type
 
 trash_items = []
 trash_types = {
@@ -700,7 +766,7 @@ def generate_trash(n=20, min_distance_from_player=100):
         x = random.randint(-grid_length + 50, grid_length - 50)
         z = random.randint(-grid_length + 50, grid_length - 50)
 
-        # Check distance from player AND other trash
+        # Check distance from player and other trash
         if math.hypot(player_pos[0] - x, player_pos[2] - z) >= min_distance_from_player \
            and is_position_free(x, z, margin=size):
             trash_items.append({
@@ -712,18 +778,97 @@ def generate_trash(n=20, min_distance_from_player=100):
             })
 
 def is_position_free(x, z, margin=25):
+    # Check collision with trash items
     for t in trash_items:
         tx, tz = t["pos"][0], t["pos"][2]
         if math.hypot(x - tx, z - tz) < (margin + t["size"]/2):
             return False
+    
+    # Check collision with bins
+    for b in bins:
+        bx, by, bz = b["pos"]
+        bin_radius = 25  # Bin collision radius
+        if math.hypot(x - bx, z - bz) < (margin + bin_radius):
+            return False
+    
+    # Check collision with maze walls (dark brown)
     for wall in maze_walls:
         x1, z1, x2, z2, _, _ = wall
-        min_x, max_x = min(x1,x2), max(x1,x2)
-        min_z, max_z = min(z1,z2), max(z1,z2)
-        if min_x - margin <= x <= max_x + margin and min_z - margin <= z <= max_z + margin:
+        # Check wall proximity
+        if is_near_wall_segment(x, z, x1, z1, x2, z2, margin):
             return False
+    
+    # Check collision with boundary walls (light brown walls beside roads)
+    # Check wall segments only
+    
+    # Outside grid perimeter walls
+    if (x <= -grid_length + margin or x >= grid_length - margin or 
+        z <= -grid_length + margin or z >= grid_length - margin):
+        return False
+    
+    # Boundary wall segments
+    wall_segments = [
+        # Left bottom road walls
+        (-grid_length, 550, -road_width/2, 550),  # horizontal wall at z=550
+        (-grid_length, 350, -road_width/2, 350),  # horizontal wall at z=350
         
+        # Left top road walls
+        (-grid_length, -550, -road_width/2, -550),  # horizontal wall at z=-550
+        (-grid_length, -350, -road_width/2, -350),  # horizontal wall at z=-350
+        
+        # Right bottom road walls
+        (grid_length, 550, road_width/2, 550),   # horizontal wall at z=550
+        (grid_length, 350, road_width/2, 350),   # horizontal wall at z=350
+        
+        # Right top road walls
+        (grid_length, -550, road_width/2, -550),  # horizontal wall at z=-550
+        (grid_length, -350, road_width/2, -350),  # horizontal wall at z=-350
+        
+        # Center road walls (vertical)
+        (-100, grid_length, -100, 900),   # left center wall
+        (100, grid_length, 100, 900),     # right center wall
+        (-100, -grid_length, -100, -900), # left center wall (bottom)
+        (100, -grid_length, 100, -900),   # right center wall (bottom)
+        
+        # Center connecting walls
+        (-100, 350, -100, 0),    # left connector
+        (100, -350, 100, 0),     # right connector
+    ]
+    
+    # Check collision with wall segments
+    for x1, z1, x2, z2 in wall_segments:
+        if is_near_wall_segment(x, z, x1, z1, x2, z2, margin):
+            return False
+    
     return True
+
+def is_near_wall_segment(px, pz, x1, z1, x2, z2, margin):
+    """Check if point (px, pz) is within margin distance of wall segment from (x1,z1) to (x2,z2)"""
+    # Calculate distance from point to line
+    
+    # Vector from start to end of wall
+    wall_dx = x2 - x1
+    wall_dz = z2 - z1
+    wall_length_sq = wall_dx * wall_dx + wall_dz * wall_dz
+    
+    if wall_length_sq == 0:
+        # Wall is a point
+        return math.hypot(px - x1, pz - z1) < margin
+    
+    # Vector from wall start to point
+    point_dx = px - x1
+    point_dz = pz - z1
+    
+    # Project point onto wall line (parameter t)
+    t = max(0, min(1, (point_dx * wall_dx + point_dz * wall_dz) / wall_length_sq))
+    
+    # Find closest point on wall
+    closest_x = x1 + t * wall_dx
+    closest_z = z1 + t * wall_dz
+    
+    # Check distance from point to closest point on wall
+    distance = math.hypot(px - closest_x, pz - closest_z)
+    return distance < margin
 
 def draw_trash():
     if not trash_items:
@@ -752,7 +897,7 @@ def draw_trash():
 
 # =======================...TRASH COLLECT...==================================
 inventory = []          # Holds collected trash
-inventory_limit = 5     # Max trash the player can carry
+inventory_limit = 3     # Max trash the player can carry
 current_trash = None   
 inventory_message = ""
 inventory_message_time = 0
@@ -787,6 +932,7 @@ generate_maze()#drawingmazeinopenspace
 generate_trash(n=20)#drawingtrash
 glutDisplayFunc(showScreen)
 glutKeyboardFunc(keyboardListener)
+glutKeyboardUpFunc(keyboardUpListener)  # Register key release handler
 glutSpecialFunc(specialKeyListener)
 glutMouseFunc(mouseListener)
 glutIdleFunc(idle)
