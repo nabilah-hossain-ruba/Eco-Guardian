@@ -311,11 +311,11 @@ def draw_home_boundary():
 
 
 # =================================....DRAW DUSTBIN...=================================
-def draw_cylinder_bin(color, top, bottom, hei):
+def draw_cylinder_bin(color, bottom, top, hei):
     glPushMatrix()
     glColor3f(*color)  
     glRotatef(-90, 1, 0, 0)  
-    gluCylinder(gluNewQuadric(), top, bottom, hei, 20, 20)
+    gluCylinder(gluNewQuadric(), bottom, top, hei, 20, 20)
     glPopMatrix()
 
 
@@ -347,8 +347,8 @@ def draw_bin_body(x, y, z, cube_color, cyl_color, label="BIN"):
 
     # Cylinder top (bin opening)
     glPushMatrix()
-    glTranslatef(x, y + 25, z)
-    draw_cylinder_bin(cyl_color, 20, 18, 22)
+    glTranslatef(x, y + 22, z)
+    draw_cylinder_bin(cyl_color, 20, 15, 22)
     glPopMatrix()
 
     # Draw bin type label above the bin
