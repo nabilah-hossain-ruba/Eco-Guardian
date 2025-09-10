@@ -173,9 +173,17 @@ def draw_player():
     if camera_mode != 'first':
         glPushMatrix()
         glTranslatef(0, head_y, 0)
-        glColor3f(0, 0, 0)
+        glColor3f(0.957, 0.743, 0.576)
         glutSolidSphere(12, 20, 20)
         glPopMatrix()
+    
+    # HAT
+    glPushMatrix()
+    glColor3f(0.545, 0.271, 0.075)  
+    glTranslatef(0, head_y + 10, 0)
+    glRotatef(-90, 1, 0, 0)  
+    gluCylinder(gluNewQuadric(), 20, 0, 20, 20, 20)
+    glPopMatrix()
      
     # Draw arms
     glPushMatrix()
@@ -423,7 +431,7 @@ def draw_bin_body(x, y, z, cube_color, cyl_color, label="BIN"):
     glPopMatrix()
 
     glPushMatrix()
-    glColor3f(0.9, 0.34, 0.9)
+    glColor3f(1, 1, 1)
     glRasterPos3f(x - 15, y + 50, z)
     for ch in label:
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(ch))
